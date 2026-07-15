@@ -50,6 +50,14 @@
     group: www-data
     mode: '0750'
 
+  - name: Create final crown flag
+  copy:
+    dest: /var/www/html/admin_portal_v2/.secret_vault/crown.txt
+    content: "FLAG{full_ch41n_SQL1_LFI_l0g_RCE}\n"
+    owner: www-data
+    group: www-data
+    mode: '0640'
+
 - name: Ensure Apache access log is world-unreadable-but-www-data-readable (needed for log poisoning exercise)
   file:
     path: /var/log/apache2/access.log
