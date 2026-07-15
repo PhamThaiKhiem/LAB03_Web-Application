@@ -10,7 +10,6 @@
     update_cache: true
   environment:
     DEBIAN_FRONTEND: noninteractive
-  ignore_errors: true
 
 - name: Verify dirb wordlist is present
   stat:
