@@ -50,7 +50,7 @@
     group: www-data
     mode: '0750'
 
-  - name: Create final crown flag
+- name: Create final crown flag
   copy:
     dest: /var/www/html/admin_portal_v2/.secret_vault/crown.txt
     content: "FLAG{full_ch41n_SQL1_LFI_l0g_RCE}\n"
