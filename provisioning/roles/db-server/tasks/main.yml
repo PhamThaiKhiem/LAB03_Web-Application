@@ -36,7 +36,7 @@
     executable: /bin/bash
 
 - name: Create taskmgr application user with remote access from webserver
-  mysql_user:
+  community.mysql.mysql_user:
     name: taskmgr
     password: "Db_S3cr3t_2024_wr4pp3r"
     priv: 'taskmanager.*:ALL'
