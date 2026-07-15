@@ -1,0 +1,50 @@
+- name: Install MySQL server and Python connector
+  apt:
+    name:
+      - mariadb-server
+      - python3-pymysql
+    state: present
+    update_cache: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Start and enable MySQL service
+  systemd:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Allow remote connections (bind-address 0.0.0.0)
+  lineinfile:
+    path: /etc/mysql/mariadb.conf.d/50-server.cnf
+    regexp: '^bind-address'
+    line: 'bind-address = 0.0.0.0'
+  notify: restart mariadb
+
+- name: Flush handlers to apply bind-address change before continuing
+  meta: flush_handlers
+
+- name: Load TaskManager database schema
+  template:
+    src: schema.sql.j2
+    dest: /tmp/schema.sql
+    mode: '0644'
+
+- name: Import schema into MySQL
+  shell: mysql < /tmp/schema.sql
+  args:
+    executable: /bin/bash
+
+- name: Create taskmgr application user with remote access from webserver
+  mysql_user:
+    name: taskmgr
+    password: "Db_S3cr3t_2024_wr4pp3r"
+    priv: 'taskmanager.*:ALL'
+    host: '172.16.0.10'
+    login_unix_socket: /run/mysqld/mysqld.sock
+    state: present
+
+- name: Remove temporary schema file
+  file:
+    path: /tmp/schema.sql
+    state: absent

