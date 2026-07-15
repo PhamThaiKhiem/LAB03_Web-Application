@@ -5,7 +5,7 @@
       - sqlmap
       - netcat-traditional
       - curl
-      - seclists
+      - dirb
     state: present
     update_cache: true
   environment:
