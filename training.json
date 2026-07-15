@@ -44,7 +44,7 @@
       "answer": "/admin_portal_v2",
       "answer_variable_name": null,
       "content": "The public TaskManager homepage doesn't link to any admin interface. Use content discovery to find it.\n\nAs a flag, submit the **path of the hidden admin directory**, in the format `/directory_name`.",
-      "solution": "```\nuser@attacker:~$ gobuster dir -u http://172.16.0.10 -w /usr/share/wordlists/dirb/common.txt -x php\n```\nAmong the noise of 404s, one path stands out with a 200/301 response instead of the expected 404.\n\nThe flag is: ${ANSWER}\n",
+      "solution": "```\nuser@attacker:~$ gobuster dir -u http://172.16.0.10 -w /usr/share/dirb/wordlists/common.txt -x php,txt\n```\nAmong the noise of 404s, one path stands out with a 200/301 response instead of the expected 404.\n\nThe flag is: ${ANSWER}\n",
       "solution_penalized": true,
       "hints": [
         {
